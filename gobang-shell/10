@@ -1,0 +1,118 @@
+#!/bin/bash
+
+# 初始化棋盘配置
+readonly SIZE=15
+board=()
+for ((i=0; i<SIZE; i++)); do
+    board[i]=$(printf '%0.s.' $(seq 1 $SIZE))
+done
+
+# 显示棋盘（强制对齐版）
+print_board() {
+    clear
+    # 生成带格式的列标签
+    printf "    "
+    for ((i=0; i<SIZE; i++)); do
+        printf "%-3s" $(printf "\\x$(printf %x $((65+i)))")
+    done
+    echo
+
+    # 打印带格式的棋盘内容
+    for ((i=0; i<SIZE; i++)); do
+        printf "%2d " $((i+1))
+        echo "${board[i]}" | sed 's/./&  /g' | sed 's/   $//'
+    done
+}
+
+# 胜负判断函数
+check_win() {
+    local x=$1 y=$2 player=${board[x]:y:1}
+    local directions=("0,1" "1,0" "1,1" "1,-1")
+    
+    for dir in "${directions[@]}"; do
+        IFS=',' read dx dy <<< "$dir"
+        count=1
+        
+        # 正向检查
+        for ((step=1; step<5; step++)); do
+            nx=$((x + dx * step))
+            ny=$((y + dy * step))
+            ((nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE)) && break
+            [[ "${board[nx]:ny:1}" == "$player" ]] || break
+            count=$((count + 1))
+        done
+        
+        # 反向检查
+        for ((step=1; step<5; step++)); do
+            nx=$((x - dx * step))
+            ny=$((y - dy * step))
+            ((nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE)) && break
+            [[ "${board[nx]:ny:1}" == "$player" ]] || break
+            count=$((count + 1))
+        done
+        
+        ((count >=5)) && return 0
+    done
+    return 1
+}
+
+# 玩家切换机制
+players=("✗" "◯")
+current=0
+current_player=${players[current]}
+
+# 主游戏循环
+while true; do
+    print_board
+    current=$((1 - current))
+    current_player=${players[current]}
+    echo "玩家 ${current_player} 下在了 ${input}"
+
+current=$((1 - current))
+    current_player=${players[current]}
+    read -p "玩家 ${current_player} 请输入坐标（如A1）: " input
+    
+   
+   # 输入标准化处理
+    input=${input^^}
+    input=${input//[^A-Z0-9]/}
+  
+ 
+   [[ ! $input =~ ^([A-Z])([0-9]+)$ ]] && {
+        echo "格式错误！请输入类似A1的坐标"
+        sleep 2
+        continue
+    }
+    
+    # 坐标转换
+    col=${BASH_REMATCH[1]}
+    row=${BASH_REMATCH[2]}
+    x=$((row - 1))
+    y=$(( $(printf "%d" "'$col") - 65 ))
+    
+    # 边界验证
+    (( x < 0 || x >= SIZE || y < 0 || y >= SIZE )) && {
+        echo "坐标超出范围！"
+        sleep 2
+        continue
+    }
+    
+    # 位置验证
+    [[ "${board[x]:y:1}" != "." ]] && {
+        echo "该位置已被占据！"
+        sleep 2
+        continue
+    }
+    
+    # 更新棋盘
+ board[x]=$(echo "${board[x]}" | sed "s/./${current_player}/$((y+1))")   
+    if check_win $x $y; then
+        print_board
+        echo -e "\e[32m玩家 ${current_player} 获胜！\e[0m"
+        exit 0
+    fi
+    
+    # 切换玩家
+    current=$((1 - current))
+    current_player=${players[current]}
+done
